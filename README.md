@@ -13,6 +13,13 @@ mise run chrome-mwi
 mise run export-player-state
 cargo run -- fetch-market --output market.current.json
 cargo run -- summarize-market --market market.current.json
+cargo run -- fetch-history --item egg --days 30 --output .local/market-history/egg.json
+cargo run -- fetch-all-history \
+  --market market.current.json \
+  --output-dir .local/market-history \
+  --days 30 \
+  --delay-ms 1000
+cargo run -- summarize-history --history .local/market-history/egg.json
 cargo run -- wealth --player .local/exports/player-state.json --market market.current.json
 cargo run -- money-actions --player .local/exports/player-state.json --market market.current.json
 cargo run -- recommend-sells \
@@ -27,6 +34,12 @@ cargo run -- recommend-sells \
 
 The CDP player-state export is read-only and writes to
 `.local/exports/player-state.json` by default.
+
+Historical market data is cached under `.local/market-history/`. The fetch
+command uses the mooket/Q7 public history endpoint and refuses to reload a cache
+file younger than seven days unless `--force` is passed. Bulk history fetches
+only request base item level 0 data and skip item keys or names containing
+enhancement markers like `+1`.
 
 ## Scope From Notion
 

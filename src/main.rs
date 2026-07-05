@@ -1,18 +1,23 @@
 use std::fs::File;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use mwi_simulator::{
+    PlayerState, ProductionPlan, SellRecommendationConfig, ValuationConfig,
     data::{
-        fetch_official_marketplace_to_path, read_market_snapshot, summarize_market_snapshot,
-        OFFICIAL_MARKETPLACE_URL,
+        OFFICIAL_MARKETPLACE_URL, fetch_official_marketplace_to_path, read_market_snapshot,
+        summarize_market_snapshot,
     },
-    money_actions::{best_money_actions, ActionPlayerExport},
+    history::{
+        FetchHistoryOutcome, fetch_all_market_history, fetch_market_history_to_path,
+        read_market_history_cache, summarize_market_history, validate_history_request,
+    },
+    money_actions::{ActionPlayerExport, best_money_actions},
     recommend_sells,
     valuation::conservative_terminal_wealth,
-    wealth::{calculate_wealth, PlayerExport},
-    PlayerState, ProductionPlan, SellRecommendationConfig, ValuationConfig,
+    wealth::{PlayerExport, calculate_wealth},
 };
 
 #[derive(Debug, Parser)]
@@ -33,6 +38,44 @@ enum Command {
     SummarizeMarket {
         #[arg(long)]
         market: PathBuf,
+    },
+    /// Fetch third-party market history to a weekly local cache.
+    FetchHistory {
+        /// Item key such as egg or /items/egg.
+        #[arg(long)]
+        item: String,
+        /// Enhancement level.
+        #[arg(long, default_value_t = 0)]
+        level: u32,
+        /// Number of days requested from the history source.
+        #[arg(long, default_value_t = 30)]
+        days: u32,
+        #[arg(long)]
+        output: PathBuf,
+        /// Ignore the seven-day cache freshness guard.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Fetch base-item third-party market history for every item in a market snapshot.
+    FetchAllHistory {
+        #[arg(long)]
+        market: PathBuf,
+        #[arg(long)]
+        output_dir: PathBuf,
+        /// Number of days requested from the history source.
+        #[arg(long, default_value_t = 30)]
+        days: u32,
+        /// Delay between network attempts.
+        #[arg(long, default_value_t = 1000)]
+        delay_ms: u64,
+        /// Ignore the seven-day cache freshness guard.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Summarize a cached third-party market history file.
+    SummarizeHistory {
+        #[arg(long)]
+        history: PathBuf,
     },
     /// Calculate pessimistic player wealth from a CDP player export and market bids.
     Wealth {
@@ -87,6 +130,55 @@ fn main() -> anyhow::Result<()> {
         Command::SummarizeMarket { market } => {
             let market = read_market_snapshot(&market)?;
             let summary = summarize_market_snapshot(&market);
+
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Command::FetchHistory {
+            item,
+            level,
+            days,
+            output,
+            force,
+        } => {
+            validate_history_request(days)?;
+            let outcome = fetch_market_history_to_path(&item, level, days, &output, force)?;
+            match outcome {
+                FetchHistoryOutcome::Fetched => {
+                    eprintln!("Fetched history for {item}:{level} to {}", output.display());
+                }
+                FetchHistoryOutcome::Cached => {
+                    eprintln!(
+                        "Using fresh cached history at {}. Pass --force to reload.",
+                        output.display()
+                    );
+                }
+            }
+        }
+        Command::FetchAllHistory {
+            market,
+            output_dir,
+            days,
+            delay_ms,
+            force,
+        } => {
+            validate_history_request(days)?;
+            let market = read_market_snapshot(&market)?;
+            let report = fetch_all_market_history(
+                &market,
+                &output_dir,
+                days,
+                Duration::from_millis(delay_ms),
+                force,
+            );
+
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if report.failed > 0 {
+                anyhow::bail!("failed to fetch {} history files", report.failed);
+            }
+        }
+        Command::SummarizeHistory { history } => {
+            let history = read_market_history_cache(&history)?;
+            let summary = summarize_market_history(&history);
 
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
