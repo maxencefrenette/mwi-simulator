@@ -10,6 +10,7 @@ use mwi_simulator::{
     },
     recommend_sells,
     valuation::conservative_terminal_wealth,
+    wealth::{calculate_wealth, PlayerExport},
     PlayerState, ProductionPlan, SellRecommendationConfig, ValuationConfig,
 };
 
@@ -29,6 +30,13 @@ enum Command {
     },
     /// Summarize a normalized or official raw market snapshot.
     SummarizeMarket {
+        #[arg(long)]
+        market: PathBuf,
+    },
+    /// Calculate pessimistic player wealth from a CDP player export and market bids.
+    Wealth {
+        #[arg(long)]
+        player: PathBuf,
         #[arg(long)]
         market: PathBuf,
     },
@@ -71,6 +79,13 @@ fn main() -> anyhow::Result<()> {
             let summary = summarize_market_snapshot(&market);
 
             println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Command::Wealth { player, market } => {
+            let player = read_json::<PlayerExport>(&player)?;
+            let market = read_market_snapshot(&market)?;
+            let wealth = calculate_wealth(&player, &market);
+
+            println!("{}", serde_json::to_string_pretty(&wealth)?);
         }
         Command::RecommendSells {
             state,
