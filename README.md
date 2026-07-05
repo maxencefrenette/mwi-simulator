@@ -9,6 +9,8 @@ orders for current inventory plus expected 24h production.
 ## Run
 
 ```sh
+mise run chrome-mwi
+mise run export-player-state
 cargo run -- fetch-market --output market.current.json
 cargo run -- summarize-market --market market.current.json
 cargo run -- recommend-sells \
@@ -20,6 +22,9 @@ cargo run -- recommend-sells \
 `--market` accepts either the small normalized fixture shape used in
 `examples/market_snapshot.json` or the raw official MWI marketplace payload from
 `https://www.milkywayidle.com/game_data/marketplace.json`.
+
+The CDP player-state export is read-only and writes to
+`.local/exports/player-state.json` by default.
 
 ## Scope From Notion
 

@@ -1,4 +1,5 @@
 [tools]
+node = "24.11.1"
 rust = "1.91.1"
 
 [tasks.chrome-mwi]
@@ -11,3 +12,7 @@ mkdir -p .local/chrome-mwi
   --user-data-dir="$PWD/.local/chrome-mwi" \
   https://www.milkywayidle.com/
 """
+
+[tasks.export-player-state]
+description = "Export read-only MWI player state from the CDP browser profile"
+run = "node scripts/export-player-state.mjs --output .local/exports/player-state.json"
