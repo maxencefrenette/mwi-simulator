@@ -1,2 +1,13 @@
 [tools]
 rust = "1.91.1"
+
+[tasks.chrome-mwi]
+description = "Launch a dedicated Chrome profile for MWI with CDP enabled on localhost:9222"
+run = """
+mkdir -p .local/chrome-mwi
+/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome \
+  --remote-debugging-address=127.0.0.1 \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$PWD/.local/chrome-mwi" \
+  https://www.milkywayidle.com/
+"""
