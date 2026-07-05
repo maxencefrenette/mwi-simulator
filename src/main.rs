@@ -8,6 +8,7 @@ use mwi_simulator::{
         fetch_official_marketplace_to_path, read_market_snapshot, summarize_market_snapshot,
         OFFICIAL_MARKETPLACE_URL,
     },
+    money_actions::{best_money_actions, ActionPlayerExport},
     recommend_sells,
     valuation::conservative_terminal_wealth,
     wealth::{calculate_wealth, PlayerExport},
@@ -39,6 +40,15 @@ enum Command {
         player: PathBuf,
         #[arg(long)]
         market: PathBuf,
+    },
+    /// Rank unlocked noncombat actions by approximate market profit per hour.
+    MoneyActions {
+        #[arg(long)]
+        player: PathBuf,
+        #[arg(long)]
+        market: PathBuf,
+        #[arg(long, default_value_t = 25)]
+        limit: usize,
     },
     /// Recommend sell-side orders for current inventory plus expected 24h production.
     RecommendSells {
@@ -86,6 +96,17 @@ fn main() -> anyhow::Result<()> {
             let wealth = calculate_wealth(&player, &market);
 
             println!("{}", serde_json::to_string_pretty(&wealth)?);
+        }
+        Command::MoneyActions {
+            player,
+            market,
+            limit,
+        } => {
+            let player = read_json::<ActionPlayerExport>(&player)?;
+            let market = read_market_snapshot(&market)?;
+            let actions = best_money_actions(&player, &market, limit);
+
+            println!("{}", serde_json::to_string_pretty(&actions)?);
         }
         Command::RecommendSells {
             state,

@@ -1,5 +1,6 @@
 pub mod data;
 pub mod model;
+pub mod money_actions;
 pub mod recommend;
 pub mod valuation;
 pub mod wealth;

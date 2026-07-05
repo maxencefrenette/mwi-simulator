@@ -14,6 +14,7 @@ mise run export-player-state
 cargo run -- fetch-market --output market.current.json
 cargo run -- summarize-market --market market.current.json
 cargo run -- wealth --player .local/exports/player-state.json --market market.current.json
+cargo run -- money-actions --player .local/exports/player-state.json --market market.current.json
 cargo run -- recommend-sells \
   --state examples/player_state.json \
   --market examples/market_snapshot.json \
