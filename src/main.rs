@@ -15,6 +15,7 @@ use mwi_simulator::{
         read_market_history_cache, summarize_market_history, validate_history_request,
     },
     money_actions::{ActionPlayerExport, best_money_actions},
+    rank_actions::{RankActionsConfig, rank_actions},
     recommend_sells,
     valuation::conservative_terminal_wealth,
     wealth::{PlayerExport, calculate_wealth},
@@ -90,6 +91,17 @@ enum Command {
         player: PathBuf,
         #[arg(long)]
         market: PathBuf,
+        #[arg(long, default_value_t = 25)]
+        limit: usize,
+    },
+    /// Rank unlocked noncombat actions with history-aware sell-through adjustment.
+    RankActions {
+        #[arg(long)]
+        player: PathBuf,
+        #[arg(long)]
+        market: PathBuf,
+        #[arg(long)]
+        history_dir: PathBuf,
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -197,6 +209,19 @@ fn main() -> anyhow::Result<()> {
             let player = read_json::<ActionPlayerExport>(&player)?;
             let market = read_market_snapshot(&market)?;
             let actions = best_money_actions(&player, &market, limit);
+
+            println!("{}", serde_json::to_string_pretty(&actions)?);
+        }
+        Command::RankActions {
+            player,
+            market,
+            history_dir,
+            limit,
+        } => {
+            let player = read_json::<ActionPlayerExport>(&player)?;
+            let market = read_market_snapshot(&market)?;
+            let actions =
+                rank_actions(&player, &market, &history_dir, RankActionsConfig { limit })?;
 
             println!("{}", serde_json::to_string_pretty(&actions)?);
         }

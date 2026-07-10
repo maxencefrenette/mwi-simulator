@@ -129,7 +129,15 @@ pub struct MoneyAction {
     pub drink_cost_per_hour: f64,
     pub profit_per_hour: f64,
     pub profit_per_action: f64,
+    pub outputs_per_hour: Vec<ActionItemRate>,
     pub missing_prices: Vec<MissingActionPrice>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ActionItemRate {
+    pub item: String,
+    pub quantity_per_hour: f64,
+    pub bid_value_per_hour: f64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -231,6 +239,7 @@ fn evaluate_action(
             .max(MIN_ACTION_TIME_SECONDS);
     let actions_per_hour = SECONDS_PER_HOUR / action_time_seconds;
     let effective_actions_per_hour = actions_per_hour * modifiers.efficiency_multiplier;
+    let outputs_per_hour = output_rates(action, market, &modifiers, effective_actions_per_hour);
     let revenue_per_effective_action =
         fixed_output_value(action, market, modifiers.gourmet_bonus, &mut missing_prices)
             + drop_table_value(
@@ -281,6 +290,7 @@ fn evaluate_action(
         drink_cost_per_hour,
         profit_per_hour,
         profit_per_action,
+        outputs_per_hour,
         missing_prices,
     }
 }
@@ -500,6 +510,97 @@ fn output_bid_value(
             });
             0.0
         }
+    }
+}
+
+fn output_rates(
+    action: &ActionDetail,
+    market: &MarketSnapshot,
+    modifiers: &ActionModifiers,
+    effective_actions_per_hour: f64,
+) -> Vec<ActionItemRate> {
+    let mut rates = Vec::new();
+
+    for item in action.output_items.as_deref().unwrap_or_default() {
+        push_output_rate(
+            &mut rates,
+            market,
+            &item_key_from_hrid(&item.item_hrid),
+            item.count * (1.0 + modifiers.gourmet_bonus) * effective_actions_per_hour,
+        );
+    }
+
+    push_drop_rates(
+        &mut rates,
+        action.drop_table.as_deref(),
+        market,
+        modifiers.gathering_bonus,
+        0.0,
+        effective_actions_per_hour,
+    );
+    push_drop_rates(
+        &mut rates,
+        action.essence_drop_table.as_deref(),
+        market,
+        0.0,
+        modifiers.rare_find_bonus,
+        effective_actions_per_hour,
+    );
+    push_drop_rates(
+        &mut rates,
+        action.rare_drop_table.as_deref(),
+        market,
+        0.0,
+        modifiers.rare_find_bonus,
+        effective_actions_per_hour,
+    );
+
+    rates.sort_by(|left, right| left.item.cmp(&right.item));
+    rates
+}
+
+fn push_drop_rates(
+    rates: &mut Vec<ActionItemRate>,
+    drops: Option<&[DropItem]>,
+    market: &MarketSnapshot,
+    quantity_bonus: f64,
+    drop_rate_bonus: f64,
+    effective_actions_per_hour: f64,
+) {
+    for drop in drops.unwrap_or_default() {
+        let expected_count = drop.drop_rate
+            * (1.0 + drop_rate_bonus)
+            * ((drop.min_count + drop.max_count) / 2.0)
+            * (1.0 + quantity_bonus);
+        push_output_rate(
+            rates,
+            market,
+            &item_key_from_hrid(&drop.item_hrid),
+            expected_count * effective_actions_per_hour,
+        );
+    }
+}
+
+fn push_output_rate(
+    rates: &mut Vec<ActionItemRate>,
+    market: &MarketSnapshot,
+    item: &str,
+    quantity_per_hour: f64,
+) {
+    let bid_value_per_hour = coin_price(item)
+        .or_else(|| market.items.get(item).and_then(|quote| quote.bid))
+        .unwrap_or(0.0)
+        * quantity_per_hour;
+
+    if let Some(existing) = rates.iter_mut().find(|rate| rate.item == item) {
+        existing.quantity_per_hour += quantity_per_hour;
+        existing.bid_value_per_hour += bid_value_per_hour;
+    } else {
+        rates.push(ActionItemRate {
+            item: item.to_string(),
+            quantity_per_hour,
+            bid_value_per_hour,
+        });
     }
 }
 
