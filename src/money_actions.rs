@@ -701,6 +701,13 @@ mod tests {
         assert_eq!(actions[0].efficiency_bonus, 0.09);
         assert_eq!(actions[0].profit_per_action, 19.62);
         assert_eq!(actions[0].profit_per_hour, 11_772.0);
+        assert_eq!(actions[0].outputs_per_hour.len(), 1);
+        assert_eq!(actions[0].outputs_per_hour[0].item, "egg");
+        assert_eq!(actions[0].outputs_per_hour[0].quantity_per_hour, 1_308.0);
+        assert_eq!(
+            actions[0].outputs_per_hour[0].bid_value_per_hour,
+            actions[0].revenue_per_hour
+        );
     }
 
     #[test]

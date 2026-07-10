@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::model::{MarketSnapshot, OrderSide, PlayerState, ProductionPlan};
-use crate::valuation::{conservative_unit_value, ValuationConfig};
+use crate::valuation::{ValuationConfig, conservative_unit_value};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SellRecommendationConfig {
