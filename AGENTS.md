@@ -1,5 +1,11 @@
 # Agent Instructions
 
+## Development Policy
+
+This project has one user. Always make full cutovers: prefer code quality and
+simplicity over backwards compatibility, compatibility layers, or parallel old
+and new paths.
+
 ## MWI Automation Boundary
 
 CDP access to Milky Way Idle is read-only.
