@@ -4,7 +4,7 @@ use std::io::{BufReader, Write};
 use std::path::Path;
 
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::model::{MarketQuote, MarketSnapshot};
 
@@ -23,14 +23,6 @@ struct OfficialMarketQuote {
     b: Option<f64>,
     p: Option<f64>,
     v: Option<f64>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct MarketSnapshotSummary {
-    pub item_count: usize,
-    pub quote_count: usize,
-    pub quotes_with_average: usize,
-    pub quotes_with_volume: usize,
 }
 
 pub fn fetch_official_marketplace() -> anyhow::Result<String> {
@@ -72,27 +64,6 @@ pub fn parse_market_snapshot_value(value: serde_json::Value) -> anyhow::Result<M
         Ok(official.into())
     } else {
         serde_json::from_value(value).context("failed to parse normalized market snapshot")
-    }
-}
-
-pub fn summarize_market_snapshot(snapshot: &MarketSnapshot) -> MarketSnapshotSummary {
-    MarketSnapshotSummary {
-        item_count: snapshot
-            .items
-            .keys()
-            .filter(|key| !key.contains(':'))
-            .count(),
-        quote_count: snapshot.items.len(),
-        quotes_with_average: snapshot
-            .items
-            .values()
-            .filter(|quote| quote.average.is_some())
-            .count(),
-        quotes_with_volume: snapshot
-            .items
-            .values()
-            .filter(|quote| quote.volume.is_some())
-            .count(),
     }
 }
 

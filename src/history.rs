@@ -36,22 +36,8 @@ pub struct MarketHistoryPoint {
     pub volume: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct MarketHistorySummary {
-    pub item: String,
-    pub level: u32,
-    pub days: u32,
-    pub point_count: usize,
-    pub first_time: Option<u64>,
-    pub last_time: Option<u64>,
-    pub total_volume: f64,
-    pub median_bid: Option<f64>,
-    pub median_ask: Option<f64>,
-    pub median_average: Option<f64>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FetchHistoryOutcome {
+enum FetchHistoryOutcome {
     Fetched,
     Cached,
 }
@@ -78,7 +64,7 @@ pub struct MarketHistoryTarget {
     pub level: u32,
 }
 
-pub fn fetch_market_history_to_path(
+fn fetch_market_history_to_path(
     item: &str,
     level: u32,
     days: u32,
@@ -212,27 +198,6 @@ pub fn read_market_history_cache(path: &Path) -> anyhow::Result<MarketHistoryCac
         .with_context(|| format!("failed to parse {}", path.display()))
 }
 
-pub fn summarize_market_history(cache: &MarketHistoryCache) -> MarketHistorySummary {
-    MarketHistorySummary {
-        item: cache.item.clone(),
-        level: cache.level,
-        days: cache.days,
-        point_count: cache.points.len(),
-        first_time: cache.points.iter().map(|point| point.time).min(),
-        last_time: cache.points.iter().map(|point| point.time).max(),
-        total_volume: cache.points.iter().filter_map(|point| point.volume).sum(),
-        median_bid: median(cache.points.iter().filter_map(|point| point.bid).collect()),
-        median_ask: median(cache.points.iter().filter_map(|point| point.ask).collect()),
-        median_average: median(
-            cache
-                .points
-                .iter()
-                .filter_map(|point| point.average)
-                .collect(),
-        ),
-    }
-}
-
 #[derive(Debug, Clone, Deserialize)]
 struct RawMarketHistoryPoint {
     time: u64,
@@ -283,21 +248,6 @@ fn item_hrid_from_key(item: &str) -> String {
 fn source_url(item_hrid: &str, level: u32, days: u32) -> String {
     let encoded_item = item_hrid.replace('/', "%2F");
     format!("{MOOKET_HISTORY_URL}?item_id={encoded_item}&variant={level}&days={days}")
-}
-
-fn median(mut values: Vec<f64>) -> Option<f64> {
-    values.retain(|value| value.is_finite() && *value > 0.0);
-    if values.is_empty() {
-        return None;
-    }
-
-    values.sort_by(f64::total_cmp);
-    let middle = values.len() / 2;
-    if values.len().is_multiple_of(2) {
-        Some((values[middle - 1] + values[middle]) / 2.0)
-    } else {
-        Some(values[middle])
-    }
 }
 
 fn positive_price(value: Option<f64>) -> Option<f64> {
@@ -389,44 +339,6 @@ mod tests {
         assert_eq!(point.bid, Some(84.0));
         assert_eq!(point.average, Some(85.0));
         assert_eq!(point.volume, Some(127_477.0));
-    }
-
-    #[test]
-    fn summarizes_history_cache() {
-        let cache = MarketHistoryCache {
-            fetched_at_unix: 1,
-            source_url: "https://example.test".to_string(),
-            item: "egg".to_string(),
-            item_hrid: "/items/egg".to_string(),
-            level: 0,
-            days: 1,
-            points: vec![
-                MarketHistoryPoint {
-                    time: 10,
-                    ask: Some(86.0),
-                    bid: Some(82.0),
-                    average: Some(84.0),
-                    volume: Some(100.0),
-                },
-                MarketHistoryPoint {
-                    time: 20,
-                    ask: Some(88.0),
-                    bid: Some(84.0),
-                    average: Some(86.0),
-                    volume: Some(300.0),
-                },
-            ],
-        };
-
-        let summary = summarize_market_history(&cache);
-
-        assert_eq!(summary.point_count, 2);
-        assert_eq!(summary.first_time, Some(10));
-        assert_eq!(summary.last_time, Some(20));
-        assert_eq!(summary.total_volume, 400.0);
-        assert_eq!(summary.median_bid, Some(83.0));
-        assert_eq!(summary.median_ask, Some(87.0));
-        assert_eq!(summary.median_average, Some(85.0));
     }
 
     #[test]
