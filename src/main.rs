@@ -7,9 +7,8 @@ use clap::{Parser, Subcommand};
 use mwi_simulator::{
     data::{OFFICIAL_MARKETPLACE_URL, fetch_official_marketplace_to_path, read_market_snapshot},
     history::{fetch_all_market_history, validate_history_request},
+    plan::{PlanConfig, plan},
     player::PlayerExport,
-    rank_actions::{RankActionsConfig, rank_actions},
-    recommend_orders::{RecommendOrdersConfig, recommend_orders},
     wealth::calculate_wealth,
 };
 
@@ -45,8 +44,8 @@ enum Command {
         #[arg(long)]
         market: PathBuf,
     },
-    /// Rank unlocked noncombat actions with history-aware sell-through adjustment.
-    RankActions {
+    /// Rank actions and recommend persistent market orders.
+    Plan {
         #[arg(long)]
         player: PathBuf,
         #[arg(long)]
@@ -54,16 +53,7 @@ enum Command {
         #[arg(long)]
         history_dir: PathBuf,
         #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Recommend persistent buy orders that unlock valuable 24h action packages.
-    RecommendOrders {
-        #[arg(long)]
-        player: PathBuf,
-        #[arg(long)]
-        market: PathBuf,
-        #[arg(long)]
-        history_dir: PathBuf,
+        action_limit: usize,
         #[arg(long, default_value_t = 10)]
         max_orders: usize,
         #[arg(long, default_value_t = 5)]
@@ -115,23 +105,11 @@ fn main() -> anyhow::Result<()> {
 
             println!("{}", serde_json::to_string_pretty(&wealth)?);
         }
-        Command::RankActions {
+        Command::Plan {
             player,
             market,
             history_dir,
-            limit,
-        } => {
-            let player = read_json::<PlayerExport>(&player)?;
-            let market = read_market_snapshot(&market)?;
-            let actions =
-                rank_actions(&player, &market, &history_dir, RankActionsConfig { limit })?;
-
-            println!("{}", serde_json::to_string_pretty(&actions)?);
-        }
-        Command::RecommendOrders {
-            player,
-            market,
-            history_dir,
+            action_limit,
             max_orders,
             alternatives,
             tick_size,
@@ -141,11 +119,12 @@ fn main() -> anyhow::Result<()> {
         } => {
             let player = read_json::<PlayerExport>(&player)?;
             let market = read_market_snapshot(&market)?;
-            let recommendation = recommend_orders(
+            let daily_plan = plan(
                 &player,
                 &market,
                 &history_dir,
-                RecommendOrdersConfig {
+                PlanConfig {
+                    action_limit,
                     max_orders,
                     alternatives,
                     tick_size,
@@ -155,7 +134,7 @@ fn main() -> anyhow::Result<()> {
                 },
             )?;
 
-            println!("{}", serde_json::to_string_pretty(&recommendation)?);
+            println!("{}", serde_json::to_string_pretty(&daily_plan)?);
         }
     }
 

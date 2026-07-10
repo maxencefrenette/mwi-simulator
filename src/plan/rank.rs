@@ -1,20 +1,10 @@
 use std::collections::HashMap;
-use std::path::Path;
 
-use anyhow::Context;
 use serde::Serialize;
 
-use crate::history::{MarketHistoryCache, read_market_history_cache};
-use crate::model::MarketSnapshot;
-use crate::money_actions::{MissingActionPrice, MoneyAction, best_money_actions};
-use crate::player::PlayerExport;
+use crate::money_actions::{MissingActionPrice, MoneyAction};
 
 const HOURS_PER_DAY: f64 = 24.0;
-
-#[derive(Debug, Clone, Copy)]
-pub struct RankActionsConfig {
-    pub limit: usize,
-}
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct RankedAction {
@@ -45,29 +35,10 @@ pub struct OutputLiquidity {
     pub sellable_fraction: f64,
 }
 
-pub fn rank_actions(
-    player: &PlayerExport,
-    market: &MarketSnapshot,
-    history_dir: &Path,
-    config: RankActionsConfig,
-) -> anyhow::Result<Vec<RankedAction>> {
-    let histories = read_market_histories(history_dir)?;
-    let daily_volumes = daily_volumes(&histories);
-    Ok(rank_actions_with_daily_volumes(
-        player,
-        market,
-        &daily_volumes,
-        config,
-    ))
-}
-
-pub(crate) fn rank_actions_with_daily_volumes(
-    player: &PlayerExport,
-    market: &MarketSnapshot,
+pub(crate) fn rank_money_actions(
+    raw_actions: Vec<MoneyAction>,
     daily_volumes: &HashMap<String, f64>,
-    config: RankActionsConfig,
 ) -> Vec<RankedAction> {
-    let raw_actions = best_money_actions(player, market, usize::MAX);
     let mut ranked = raw_actions
         .into_iter()
         .map(|action| rank_action(action, daily_volumes))
@@ -84,8 +55,6 @@ pub(crate) fn rank_actions_with_daily_volumes(
             })
             .then_with(|| left.action.cmp(&right.action))
     });
-    ranked.truncate(config.limit);
-
     for (index, action) in ranked.iter_mut().enumerate() {
         action.rank = index + 1;
     }
@@ -139,17 +108,6 @@ fn rank_action(action: MoneyAction, daily_volumes: &HashMap<String, f64>) -> Ran
     }
 }
 
-pub(crate) fn historical_daily_volume(history: &MarketHistoryCache) -> Option<f64> {
-    (history.days > 0).then(|| {
-        history
-            .points
-            .iter()
-            .filter_map(|point| point.volume)
-            .sum::<f64>()
-            / f64::from(history.days)
-    })
-}
-
 fn sellable_fraction(
     item: &str,
     historical_daily_volume: Option<f64>,
@@ -167,39 +125,6 @@ fn sellable_fraction(
         .filter(|volume| volume.is_finite() && *volume > 0.0)
         .map(|volume| (volume / expected_24h_quantity).clamp(0.0, 1.0))
         .unwrap_or(0.0)
-}
-
-pub(crate) fn daily_volumes(
-    histories: &HashMap<String, MarketHistoryCache>,
-) -> HashMap<String, f64> {
-    histories
-        .iter()
-        .filter_map(|(item, history)| {
-            historical_daily_volume(history).map(|volume| (item.clone(), volume))
-        })
-        .collect()
-}
-
-pub(crate) fn read_market_histories(
-    history_dir: &Path,
-) -> anyhow::Result<HashMap<String, MarketHistoryCache>> {
-    let mut histories = HashMap::new();
-
-    for entry in std::fs::read_dir(history_dir)
-        .with_context(|| format!("failed to read {}", history_dir.display()))?
-    {
-        let entry =
-            entry.with_context(|| format!("failed to read entry in {}", history_dir.display()))?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-            continue;
-        }
-
-        let history = read_market_history_cache(&path)?;
-        histories.insert(history.item.clone(), history);
-    }
-
-    Ok(histories)
 }
 
 #[cfg(test)]

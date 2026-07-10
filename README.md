@@ -10,11 +10,7 @@ mise run chrome-mwi
 mise run export-player-state
 cargo run -- fetch-market
 cargo run -- wealth --player .local/exports/player-state.json --market .local/market.current.json
-cargo run -- rank-actions \
-  --player .local/exports/player-state.json \
-  --market .local/market.current.json \
-  --history-dir .local/market-history
-cargo run -- recommend-orders \
+cargo run -- plan \
   --player .local/exports/player-state.json \
   --market .local/market.current.json \
   --history-dir .local/market-history
@@ -33,14 +29,13 @@ seven days unless `--force-history` is passed. History refreshes only request
 base item level 0 data and skip item keys or names containing enhancement
 markers like `+1`.
 
-`recommend-orders` values persistent buy-order bundles by the 24-hour action
-packages they unlock. Fill delay is estimated from a configurable share of
+`plan` returns liquidity-adjusted action rankings and persistent buy-order
+bundles in one result. Fill delay is estimated from a configurable share of
 historical daily volume, then the package uplift is discounted for waiting,
-capital lockup, and order-slot occupancy. The output includes the selected
-bundle, reservation prices, and ranked alternatives. Suggested limits use a
-passive `current bid + tick` policy, capped at the current ask; historical ask
-reach is included in the estimated fill delay. Prices are rounded to the same
-discrete bins as the game client before costs and fill times are evaluated.
+capital lockup, and order-slot occupancy. Suggested limits use a passive
+`current bid + tick` policy, capped at the current ask; historical ask reach is
+included in the estimated fill delay. Prices are rounded to the same discrete
+bins as the game client before costs and fill times are evaluated.
 
 ## Scope From Notion
 

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
@@ -165,7 +166,7 @@ pub fn fetch_all_market_history(
     report
 }
 
-pub fn fetch_market_history_points(
+fn fetch_market_history_points(
     item_hrid: &str,
     level: u32,
     days: u32,
@@ -192,10 +193,49 @@ pub fn fetch_market_history_points(
         .collect())
 }
 
-pub fn read_market_history_cache(path: &Path) -> anyhow::Result<MarketHistoryCache> {
+fn read_market_history_cache(path: &Path) -> anyhow::Result<MarketHistoryCache> {
     let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     serde_json::from_reader(BufReader::new(file))
         .with_context(|| format!("failed to parse {}", path.display()))
+}
+
+pub(crate) fn read_market_history_dir(
+    history_dir: &Path,
+) -> anyhow::Result<HashMap<String, MarketHistoryCache>> {
+    let mut histories = HashMap::new();
+
+    for entry in std::fs::read_dir(history_dir)
+        .with_context(|| format!("failed to read {}", history_dir.display()))?
+    {
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", history_dir.display()))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+
+        let history = read_market_history_cache(&path)?;
+        histories.insert(history.item.clone(), history);
+    }
+
+    Ok(histories)
+}
+
+pub(crate) fn daily_market_volumes(
+    histories: &HashMap<String, MarketHistoryCache>,
+) -> HashMap<String, f64> {
+    histories
+        .iter()
+        .filter(|(_, history)| history.days > 0)
+        .map(|(item, history)| {
+            let total_volume = history
+                .points
+                .iter()
+                .filter_map(|point| point.volume)
+                .sum::<f64>();
+            (item.clone(), total_volume / f64::from(history.days))
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Deserialize)]

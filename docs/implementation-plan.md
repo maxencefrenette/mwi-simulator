@@ -14,17 +14,15 @@ at current bids, and items locked in sell orders at current bids.
 - `data`: official marketplace snapshot fetch and parsing.
 - `history`: weekly cached market-history refresh and parsing.
 - `money_actions`: noncombat action production and cost calculations.
-- `rank_actions`: history-aware output-liquidity adjustment.
 - `market_price`: the game's discrete market-price bins.
-- `recommend_orders`: persistent input-buy package recommendations.
+- `plan`: action ranking, persistent input-buy policy, and shared orchestration.
 - `wealth`: pessimistic current wealth calculation.
 
 ## Current Commands
 
 - `fetch-market`
 - `wealth`
-- `rank-actions`
-- `recommend-orders`
+- `plan`
 
 ## Next Steps
 
