@@ -24,6 +24,8 @@ const PRODUCTION_ACTION_TYPES: &[&str] = &[
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ActionPlayerExport {
+    #[serde(default)]
+    pub derived: DerivedPlayerState,
     #[serde(default, rename = "characterSkillMap")]
     pub character_skill_map: HashMap<String, CharacterSkill>,
     #[serde(default, rename = "actionDetailMaps")]
@@ -34,6 +36,39 @@ pub struct ActionPlayerExport {
     pub skilling_action_hrid_buffs_dict: HashMap<String, Option<Vec<Buff>>>,
     #[serde(default, rename = "actionTypeDrinkSlotsDict")]
     pub action_type_drink_slots_dict: HashMap<String, Vec<Option<DrinkSlot>>>,
+    #[serde(default, rename = "itemDetailDict")]
+    pub item_detail_dict: HashMap<String, ItemDetail>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ItemDetail {
+    #[serde(default, rename = "sellPrice")]
+    pub sell_price: f64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct DerivedPlayerState {
+    #[serde(default)]
+    pub cash: f64,
+    #[serde(default)]
+    pub inventory: Vec<DerivedInventoryItem>,
+    #[serde(default, rename = "openOrders")]
+    pub open_orders: Vec<DerivedOpenOrder>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DerivedInventoryItem {
+    pub item: String,
+    pub quantity: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DerivedOpenOrder {
+    pub side: String,
+    pub item: String,
+    pub quantity: f64,
+    #[serde(rename = "limitPrice")]
+    pub limit_price: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -129,8 +164,24 @@ pub struct MoneyAction {
     pub drink_cost_per_hour: f64,
     pub profit_per_hour: f64,
     pub profit_per_action: f64,
+    pub inputs_per_hour: Vec<ActionInputRate>,
     pub outputs_per_hour: Vec<ActionItemRate>,
     pub missing_prices: Vec<MissingActionPrice>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ActionInputRate {
+    pub item: String,
+    pub quantity_per_hour: f64,
+    pub ask_cost_per_hour: f64,
+    pub source: ActionInputSource,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ActionInputSource {
+    Recipe,
+    Drink,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -239,6 +290,14 @@ fn evaluate_action(
             .max(MIN_ACTION_TIME_SECONDS);
     let actions_per_hour = SECONDS_PER_HOUR / action_time_seconds;
     let effective_actions_per_hour = actions_per_hour * modifiers.efficiency_multiplier;
+    let inputs_per_hour = input_rates(
+        player,
+        action_type,
+        action,
+        market,
+        &modifiers,
+        effective_actions_per_hour,
+    );
     let outputs_per_hour = output_rates(action, market, &modifiers, effective_actions_per_hour);
     let revenue_per_effective_action =
         fixed_output_value(action, market, modifiers.gourmet_bonus, &mut missing_prices)
@@ -290,8 +349,78 @@ fn evaluate_action(
         drink_cost_per_hour,
         profit_per_hour,
         profit_per_action,
+        inputs_per_hour,
         outputs_per_hour,
         missing_prices,
+    }
+}
+
+fn input_rates(
+    player: &ActionPlayerExport,
+    action_type: &str,
+    action: &ActionDetail,
+    market: &MarketSnapshot,
+    modifiers: &ActionModifiers,
+    effective_actions_per_hour: f64,
+) -> Vec<ActionInputRate> {
+    let mut rates = Vec::new();
+
+    for item in action.input_items.as_deref().unwrap_or_default() {
+        push_input_rate(
+            &mut rates,
+            market,
+            &item_key_from_hrid(&item.item_hrid),
+            item.count * (1.0 - modifiers.artisan_bonus) * effective_actions_per_hour,
+            ActionInputSource::Recipe,
+        );
+    }
+
+    for drink in player
+        .action_type_drink_slots_dict
+        .get(action_type)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|drink| drink.is_active)
+    {
+        push_input_rate(
+            &mut rates,
+            market,
+            &item_key_from_hrid(&drink.item_hrid),
+            DRINKS_PER_HOUR,
+            ActionInputSource::Drink,
+        );
+    }
+
+    rates.sort_by(|left, right| left.item.cmp(&right.item));
+    rates
+}
+
+fn push_input_rate(
+    rates: &mut Vec<ActionInputRate>,
+    market: &MarketSnapshot,
+    item: &str,
+    quantity_per_hour: f64,
+    source: ActionInputSource,
+) {
+    let ask_cost_per_hour = coin_price(item)
+        .or_else(|| market.items.get(item).and_then(|quote| quote.ask))
+        .unwrap_or(0.0)
+        * quantity_per_hour;
+
+    if let Some(existing) = rates
+        .iter_mut()
+        .find(|rate| rate.item == item && rate.source == source)
+    {
+        existing.quantity_per_hour += quantity_per_hour;
+        existing.ask_cost_per_hour += ask_cost_per_hour;
+    } else {
+        rates.push(ActionInputRate {
+            item: item.to_string(),
+            quantity_per_hour,
+            ask_cost_per_hour,
+            source,
+        });
     }
 }
 
@@ -624,6 +753,7 @@ mod tests {
     #[test]
     fn ranks_unlocked_actions_by_bid_minus_ask_profit_per_hour() {
         let player = ActionPlayerExport {
+            derived: DerivedPlayerState::default(),
             character_skill_map: HashMap::from([(
                 "/skills/foraging".into(),
                 CharacterSkill {
@@ -681,6 +811,7 @@ mod tests {
             skilling_action_type_buffs_dict: HashMap::new(),
             skilling_action_hrid_buffs_dict: HashMap::new(),
             action_type_drink_slots_dict: HashMap::new(),
+            item_detail_dict: HashMap::new(),
         };
         let market = MarketSnapshot {
             items: HashMap::from([(
@@ -713,6 +844,7 @@ mod tests {
     #[test]
     fn applies_action_buffs_and_drink_costs() {
         let player = ActionPlayerExport {
+            derived: DerivedPlayerState::default(),
             character_skill_map: HashMap::from([(
                 "/skills/cooking".into(),
                 CharacterSkill {
@@ -779,6 +911,7 @@ mod tests {
                     is_active: true,
                 })],
             )]),
+            item_detail_dict: HashMap::new(),
         };
         let market = MarketSnapshot {
             items: HashMap::from([
@@ -822,5 +955,14 @@ mod tests {
         assert_eq!(action.input_cost_per_hour, 20_250.0);
         assert_eq!(action.drink_cost_per_hour, 60.0);
         assert_eq!(action.profit_per_hour, 114_690.0);
+        assert_eq!(action.inputs_per_hour.len(), 2);
+        assert_eq!(
+            action
+                .inputs_per_hour
+                .iter()
+                .map(|input| input.ask_cost_per_hour)
+                .sum::<f64>(),
+            action.input_cost_per_hour + action.drink_cost_per_hour
+        );
     }
 }

@@ -52,11 +52,26 @@ pub fn rank_actions(
     history_dir: &Path,
     config: RankActionsConfig,
 ) -> anyhow::Result<Vec<RankedAction>> {
-    let daily_volumes = read_daily_volumes(history_dir)?;
+    let histories = read_market_histories(history_dir)?;
+    let daily_volumes = daily_volumes(&histories);
+    Ok(rank_actions_with_daily_volumes(
+        player,
+        market,
+        &daily_volumes,
+        config,
+    ))
+}
+
+pub(crate) fn rank_actions_with_daily_volumes(
+    player: &ActionPlayerExport,
+    market: &MarketSnapshot,
+    daily_volumes: &HashMap<String, f64>,
+    config: RankActionsConfig,
+) -> Vec<RankedAction> {
     let raw_actions = best_money_actions(player, market, usize::MAX);
     let mut ranked = raw_actions
         .into_iter()
-        .map(|action| rank_action(action, &daily_volumes))
+        .map(|action| rank_action(action, daily_volumes))
         .collect::<Vec<_>>();
 
     ranked.sort_by(|left, right| {
@@ -76,7 +91,7 @@ pub fn rank_actions(
         action.rank = index + 1;
     }
 
-    Ok(ranked)
+    ranked
 }
 
 fn rank_action(action: MoneyAction, daily_volumes: &HashMap<String, f64>) -> RankedAction {
@@ -125,7 +140,7 @@ fn rank_action(action: MoneyAction, daily_volumes: &HashMap<String, f64>) -> Ran
     }
 }
 
-fn historical_daily_volume(history: &MarketHistoryCache) -> Option<f64> {
+pub(crate) fn historical_daily_volume(history: &MarketHistoryCache) -> Option<f64> {
     (history.days > 0).then(|| {
         history
             .points
@@ -155,8 +170,21 @@ fn sellable_fraction(
         .unwrap_or(0.0)
 }
 
-fn read_daily_volumes(history_dir: &Path) -> anyhow::Result<HashMap<String, f64>> {
-    let mut daily_volumes = HashMap::new();
+pub(crate) fn daily_volumes(
+    histories: &HashMap<String, MarketHistoryCache>,
+) -> HashMap<String, f64> {
+    histories
+        .iter()
+        .filter_map(|(item, history)| {
+            historical_daily_volume(history).map(|volume| (item.clone(), volume))
+        })
+        .collect()
+}
+
+pub(crate) fn read_market_histories(
+    history_dir: &Path,
+) -> anyhow::Result<HashMap<String, MarketHistoryCache>> {
+    let mut histories = HashMap::new();
 
     for entry in std::fs::read_dir(history_dir)
         .with_context(|| format!("failed to read {}", history_dir.display()))?
@@ -169,12 +197,10 @@ fn read_daily_volumes(history_dir: &Path) -> anyhow::Result<HashMap<String, f64>
         }
 
         let history = read_market_history_cache(&path)?;
-        if let Some(volume) = historical_daily_volume(&history) {
-            daily_volumes.insert(history.item, volume);
-        }
+        histories.insert(history.item.clone(), history);
     }
 
-    Ok(daily_volumes)
+    Ok(histories)
 }
 
 #[cfg(test)]

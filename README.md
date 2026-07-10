@@ -26,6 +26,10 @@ cargo run -- rank-actions \
   --player .local/exports/player-state.json \
   --market market.current.json \
   --history-dir .local/market-history
+cargo run -- recommend-orders \
+  --player .local/exports/player-state.json \
+  --market market.current.json \
+  --history-dir .local/market-history
 cargo run -- recommend-sells \
   --state examples/player_state.json \
   --market examples/market_snapshot.json \
@@ -44,6 +48,15 @@ command uses the mooket/Q7 public history endpoint and refuses to reload a cache
 file younger than seven days unless `--force` is passed. Bulk history fetches
 only request base item level 0 data and skip item keys or names containing
 enhancement markers like `+1`.
+
+`recommend-orders` values persistent buy-order bundles by the 24-hour action
+packages they unlock. Fill delay is estimated from a configurable share of
+historical daily volume, then the package uplift is discounted for waiting,
+capital lockup, and order-slot occupancy. The output includes the selected
+bundle, reservation prices, and ranked alternatives. Suggested limits use a
+passive `current bid + tick` policy, capped at the current ask; historical ask
+reach is included in the estimated fill delay. Prices are rounded to the same
+discrete bins as the game client before costs and fill times are evaluated.
 
 ## Scope From Notion
 

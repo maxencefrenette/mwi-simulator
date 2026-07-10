@@ -16,6 +16,7 @@ use mwi_simulator::{
     },
     money_actions::{ActionPlayerExport, best_money_actions},
     rank_actions::{RankActionsConfig, rank_actions},
+    recommend_orders::{RecommendOrdersConfig, recommend_orders},
     recommend_sells,
     valuation::conservative_terminal_wealth,
     wealth::{PlayerExport, calculate_wealth},
@@ -104,6 +105,27 @@ enum Command {
         history_dir: PathBuf,
         #[arg(long, default_value_t = 25)]
         limit: usize,
+    },
+    /// Recommend persistent buy orders that unlock valuable 24h action packages.
+    RecommendOrders {
+        #[arg(long)]
+        player: PathBuf,
+        #[arg(long)]
+        market: PathBuf,
+        #[arg(long)]
+        history_dir: PathBuf,
+        #[arg(long, default_value_t = 10)]
+        max_orders: usize,
+        #[arg(long, default_value_t = 5)]
+        alternatives: usize,
+        #[arg(long, default_value_t = 1.0)]
+        tick_size: f64,
+        #[arg(long, default_value_t = 0.05)]
+        volume_participation_rate: f64,
+        #[arg(long, default_value_t = 0.05)]
+        daily_discount_rate: f64,
+        #[arg(long, default_value_t = 0.001)]
+        daily_capital_cost_rate: f64,
     },
     /// Recommend sell-side orders for current inventory plus expected 24h production.
     RecommendSells {
@@ -224,6 +246,35 @@ fn main() -> anyhow::Result<()> {
                 rank_actions(&player, &market, &history_dir, RankActionsConfig { limit })?;
 
             println!("{}", serde_json::to_string_pretty(&actions)?);
+        }
+        Command::RecommendOrders {
+            player,
+            market,
+            history_dir,
+            max_orders,
+            alternatives,
+            tick_size,
+            volume_participation_rate,
+            daily_discount_rate,
+            daily_capital_cost_rate,
+        } => {
+            let player = read_json::<ActionPlayerExport>(&player)?;
+            let market = read_market_snapshot(&market)?;
+            let recommendation = recommend_orders(
+                &player,
+                &market,
+                &history_dir,
+                RecommendOrdersConfig {
+                    max_orders,
+                    alternatives,
+                    tick_size,
+                    volume_participation_rate,
+                    daily_discount_rate,
+                    daily_capital_cost_rate,
+                },
+            )?;
+
+            println!("{}", serde_json::to_string_pretty(&recommendation)?);
         }
         Command::RecommendSells {
             state,

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::market_price::{PriceBinDirection, bin_market_price};
 use crate::model::{MarketSnapshot, OrderSide, PlayerState, ProductionPlan};
 use crate::valuation::{ValuationConfig, conservative_unit_value};
 
@@ -60,7 +61,13 @@ pub fn recommend_sells(
             let quote = market.items.get(&item)?;
             let conservative_unit = conservative_unit_value(quote, config.valuation)?;
             let ask = quote.ask.unwrap_or(conservative_unit);
-            let suggested_limit_price = (ask - config.tick_size).max(conservative_unit);
+            let desired_limit_price = (ask - config.tick_size).max(conservative_unit);
+            let rounded_down = bin_market_price(desired_limit_price, PriceBinDirection::Down, 0.0);
+            let suggested_limit_price = if rounded_down < conservative_unit {
+                bin_market_price(conservative_unit, PriceBinDirection::Up, 0.0)
+            } else {
+                rounded_down
+            };
 
             Some(SellRecommendation {
                 item,
