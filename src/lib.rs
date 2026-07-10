@@ -3,6 +3,7 @@ pub mod history;
 pub mod market_price;
 pub mod model;
 pub mod money_actions;
+pub mod player;
 pub mod rank_actions;
 pub mod recommend;
 pub mod recommend_orders;

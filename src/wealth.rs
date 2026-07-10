@@ -1,42 +1,7 @@
-use std::collections::HashMap;
+use serde::Serialize;
 
-use serde::{Deserialize, Serialize};
-
-use crate::model::MarketSnapshot;
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PlayerExport {
-    #[serde(default)]
-    pub derived: DerivedExport,
-    #[serde(default, rename = "characterItemMap")]
-    pub character_item_map: HashMap<String, CharacterItem>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct DerivedExport {
-    #[serde(default, rename = "openOrders")]
-    pub open_orders: Vec<ExportedOpenOrder>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CharacterItem {
-    #[serde(rename = "itemHrid")]
-    pub item_hrid: String,
-    #[serde(default, rename = "enhancementLevel")]
-    pub enhancement_level: u32,
-    #[serde(default)]
-    pub count: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ExportedOpenOrder {
-    pub side: String,
-    pub item: String,
-    #[serde(default)]
-    pub quantity: f64,
-    #[serde(default, rename = "lockedCash")]
-    pub locked_cash: f64,
-}
+use crate::model::{MarketSnapshot, OrderSide};
+use crate::player::PlayerExport;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct WealthSummary {
@@ -90,7 +55,7 @@ pub fn calculate_wealth(player: &PlayerExport, market: &MarketSnapshot) -> Wealt
         .derived
         .open_orders
         .iter()
-        .filter(|order| order.side == "buy")
+        .filter(|order| order.side == OrderSide::Buy)
         .map(|order| order.locked_cash)
         .sum();
 
@@ -98,7 +63,7 @@ pub fn calculate_wealth(player: &PlayerExport, market: &MarketSnapshot) -> Wealt
         .derived
         .open_orders
         .iter()
-        .filter(|order| order.side == "sell" && order.quantity > 0.0)
+        .filter(|order| order.side == OrderSide::Sell && order.quantity > 0.0)
         .map(|order| {
             bid_value(
                 &order.item,
@@ -151,28 +116,34 @@ fn item_key_from_hrid(item_hrid: &str, enhancement_level: u32) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::model::MarketQuote;
+    use crate::player::{CharacterItem, DerivedOpenOrder, DerivedPlayerState};
 
     use super::*;
 
     #[test]
     fn calculates_pessimistic_wealth_from_bid_prices() {
         let player = PlayerExport {
-            derived: DerivedExport {
+            derived: DerivedPlayerState {
                 open_orders: vec![
-                    ExportedOpenOrder {
-                        side: "buy".into(),
+                    DerivedOpenOrder {
+                        side: OrderSide::Buy,
                         item: "milk".into(),
                         quantity: 10.0,
+                        limit_price: 50.0,
                         locked_cash: 500.0,
                     },
-                    ExportedOpenOrder {
-                        side: "sell".into(),
+                    DerivedOpenOrder {
+                        side: OrderSide::Sell,
                         item: "egg".into(),
                         quantity: 25.0,
+                        limit_price: 10.0,
                         locked_cash: 0.0,
                     },
                 ],
+                ..DerivedPlayerState::default()
             },
             character_item_map: HashMap::from([
                 (
@@ -192,6 +163,7 @@ mod tests {
                     },
                 ),
             ]),
+            ..PlayerExport::default()
         };
         let market = MarketSnapshot {
             items: HashMap::from([(

@@ -14,12 +14,13 @@ use mwi_simulator::{
         FetchHistoryOutcome, fetch_all_market_history, fetch_market_history_to_path,
         read_market_history_cache, summarize_market_history, validate_history_request,
     },
-    money_actions::{ActionPlayerExport, best_money_actions},
+    money_actions::best_money_actions,
+    player::PlayerExport,
     rank_actions::{RankActionsConfig, rank_actions},
     recommend_orders::{RecommendOrdersConfig, recommend_orders},
     recommend_sells,
     valuation::conservative_terminal_wealth,
-    wealth::{PlayerExport, calculate_wealth},
+    wealth::calculate_wealth,
 };
 
 #[derive(Debug, Parser)]
@@ -228,7 +229,7 @@ fn main() -> anyhow::Result<()> {
             market,
             limit,
         } => {
-            let player = read_json::<ActionPlayerExport>(&player)?;
+            let player = read_json::<PlayerExport>(&player)?;
             let market = read_market_snapshot(&market)?;
             let actions = best_money_actions(&player, &market, limit);
 
@@ -240,7 +241,7 @@ fn main() -> anyhow::Result<()> {
             history_dir,
             limit,
         } => {
-            let player = read_json::<ActionPlayerExport>(&player)?;
+            let player = read_json::<PlayerExport>(&player)?;
             let market = read_market_snapshot(&market)?;
             let actions =
                 rank_actions(&player, &market, &history_dir, RankActionsConfig { limit })?;
@@ -258,7 +259,7 @@ fn main() -> anyhow::Result<()> {
             daily_discount_rate,
             daily_capital_cost_rate,
         } => {
-            let player = read_json::<ActionPlayerExport>(&player)?;
+            let player = read_json::<PlayerExport>(&player)?;
             let market = read_market_snapshot(&market)?;
             let recommendation = recommend_orders(
                 &player,

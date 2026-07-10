@@ -6,9 +6,8 @@ use serde::Serialize;
 
 use crate::history::{MarketHistoryCache, read_market_history_cache};
 use crate::model::MarketSnapshot;
-use crate::money_actions::{
-    ActionPlayerExport, MissingActionPrice, MoneyAction, best_money_actions,
-};
+use crate::money_actions::{MissingActionPrice, MoneyAction, best_money_actions};
+use crate::player::PlayerExport;
 
 const HOURS_PER_DAY: f64 = 24.0;
 
@@ -47,7 +46,7 @@ pub struct OutputLiquidity {
 }
 
 pub fn rank_actions(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     market: &MarketSnapshot,
     history_dir: &Path,
     config: RankActionsConfig,
@@ -63,7 +62,7 @@ pub fn rank_actions(
 }
 
 pub(crate) fn rank_actions_with_daily_volumes(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     market: &MarketSnapshot,
     daily_volumes: &HashMap<String, f64>,
     config: RankActionsConfig,

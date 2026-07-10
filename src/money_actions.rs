@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::model::MarketSnapshot;
+use crate::player::{ActionDetail, Buff, DropItem, PlayerExport};
 
 const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
 const SECONDS_PER_HOUR: f64 = 3600.0;
@@ -21,128 +22,6 @@ const PRODUCTION_ACTION_TYPES: &[&str] = &[
     "/action_types/crafting",
     "/action_types/tailoring",
 ];
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ActionPlayerExport {
-    #[serde(default)]
-    pub derived: DerivedPlayerState,
-    #[serde(default, rename = "characterSkillMap")]
-    pub character_skill_map: HashMap<String, CharacterSkill>,
-    #[serde(default, rename = "actionDetailMaps")]
-    pub action_detail_maps: HashMap<String, HashMap<String, ActionDetail>>,
-    #[serde(default, rename = "skillingActionTypeBuffsDict")]
-    pub skilling_action_type_buffs_dict: HashMap<String, Option<Vec<Buff>>>,
-    #[serde(default, rename = "skillingActionHridBuffsDict")]
-    pub skilling_action_hrid_buffs_dict: HashMap<String, Option<Vec<Buff>>>,
-    #[serde(default, rename = "actionTypeDrinkSlotsDict")]
-    pub action_type_drink_slots_dict: HashMap<String, Vec<Option<DrinkSlot>>>,
-    #[serde(default, rename = "itemDetailDict")]
-    pub item_detail_dict: HashMap<String, ItemDetail>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ItemDetail {
-    #[serde(default, rename = "sellPrice")]
-    pub sell_price: f64,
-}
-
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct DerivedPlayerState {
-    #[serde(default)]
-    pub cash: f64,
-    #[serde(default)]
-    pub inventory: Vec<DerivedInventoryItem>,
-    #[serde(default, rename = "openOrders")]
-    pub open_orders: Vec<DerivedOpenOrder>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DerivedInventoryItem {
-    pub item: String,
-    pub quantity: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DerivedOpenOrder {
-    pub side: String,
-    pub item: String,
-    pub quantity: f64,
-    #[serde(rename = "limitPrice")]
-    pub limit_price: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CharacterSkill {
-    #[serde(rename = "skillHrid")]
-    pub skill_hrid: String,
-    #[serde(default)]
-    pub level: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ActionDetail {
-    pub hrid: String,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default, rename = "baseTimeCost")]
-    pub base_time_cost: f64,
-    #[serde(default, rename = "levelRequirement")]
-    pub level_requirement: Option<LevelRequirement>,
-    #[serde(default, rename = "inputItems")]
-    pub input_items: Option<Vec<FixedItem>>,
-    #[serde(default, rename = "outputItems")]
-    pub output_items: Option<Vec<FixedItem>>,
-    #[serde(default, rename = "dropTable")]
-    pub drop_table: Option<Vec<DropItem>>,
-    #[serde(default, rename = "essenceDropTable")]
-    pub essence_drop_table: Option<Vec<DropItem>>,
-    #[serde(default, rename = "rareDropTable")]
-    pub rare_drop_table: Option<Vec<DropItem>>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct LevelRequirement {
-    #[serde(rename = "skillHrid")]
-    pub skill_hrid: String,
-    pub level: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct FixedItem {
-    #[serde(rename = "itemHrid")]
-    pub item_hrid: String,
-    pub count: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DropItem {
-    #[serde(rename = "itemHrid")]
-    pub item_hrid: String,
-    #[serde(rename = "dropRate")]
-    pub drop_rate: f64,
-    #[serde(rename = "minCount")]
-    pub min_count: f64,
-    #[serde(rename = "maxCount")]
-    pub max_count: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Buff {
-    #[serde(rename = "typeHrid")]
-    pub type_hrid: String,
-    #[serde(default, rename = "flatBoost")]
-    pub flat_boost: f64,
-    #[serde(default, rename = "ratioBoost")]
-    pub ratio_boost: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DrinkSlot {
-    #[serde(rename = "itemHrid")]
-    pub item_hrid: String,
-    #[serde(default, rename = "isActive")]
-    pub is_active: bool,
-}
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct MoneyAction {
@@ -206,7 +85,7 @@ pub enum PriceSide {
 }
 
 pub fn best_money_actions(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     market: &MarketSnapshot,
     max_results: usize,
 ) -> Vec<MoneyAction> {
@@ -276,7 +155,7 @@ fn has_economic_terms(action: &ActionDetail) -> bool {
 }
 
 fn evaluate_action(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     action_type: &str,
     action: &ActionDetail,
     market: &MarketSnapshot,
@@ -356,7 +235,7 @@ fn evaluate_action(
 }
 
 fn input_rates(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     action_type: &str,
     action: &ActionDetail,
     market: &MarketSnapshot,
@@ -436,7 +315,7 @@ struct ActionModifiers {
 }
 
 fn action_buffs<'a>(
-    player: &'a ActionPlayerExport,
+    player: &'a PlayerExport,
     action_type: &str,
     action_hrid: &str,
 ) -> Vec<&'a Buff> {
@@ -521,7 +400,7 @@ fn buff_sum_by_suffix(buffs: &[&Buff], suffix: &str) -> f64 {
 }
 
 fn drink_cost(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     action_type: &str,
     market: &MarketSnapshot,
     missing_prices: &mut Vec<MissingActionPrice>,
@@ -747,13 +626,17 @@ fn item_key_from_hrid(item_hrid: &str) -> String {
 #[cfg(test)]
 mod tests {
     use crate::model::MarketQuote;
+    use crate::player::{
+        CharacterSkill, DerivedPlayerState, DrinkSlot, FixedItem, LevelRequirement,
+    };
 
     use super::*;
 
     #[test]
     fn ranks_unlocked_actions_by_bid_minus_ask_profit_per_hour() {
-        let player = ActionPlayerExport {
+        let player = PlayerExport {
             derived: DerivedPlayerState::default(),
+            character_item_map: HashMap::new(),
             character_skill_map: HashMap::from([(
                 "/skills/foraging".into(),
                 CharacterSkill {
@@ -843,8 +726,9 @@ mod tests {
 
     #[test]
     fn applies_action_buffs_and_drink_costs() {
-        let player = ActionPlayerExport {
+        let player = PlayerExport {
             derived: DerivedPlayerState::default(),
+            character_item_map: HashMap::new(),
             character_skill_map: HashMap::from([(
                 "/skills/cooking".into(),
                 CharacterSkill {

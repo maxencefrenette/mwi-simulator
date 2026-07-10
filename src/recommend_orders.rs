@@ -7,7 +7,8 @@ use serde::Serialize;
 use crate::history::MarketHistoryCache;
 use crate::market_price::{PriceBinDirection, bin_market_price, market_price_step};
 use crate::model::{MarketSnapshot, OrderSide};
-use crate::money_actions::{ActionPlayerExport, MoneyAction, best_money_actions};
+use crate::money_actions::{MoneyAction, best_money_actions};
+use crate::player::PlayerExport;
 use crate::rank_actions::{
     RankActionsConfig, RankedAction, daily_volumes, rank_actions_with_daily_volumes,
     read_market_histories,
@@ -111,7 +112,7 @@ pub struct OrderPolicyAssumptions {
 }
 
 pub fn recommend_orders(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     market: &MarketSnapshot,
     history_dir: &Path,
     config: RecommendOrdersConfig,
@@ -129,7 +130,7 @@ pub fn recommend_orders(
 }
 
 fn recommend_orders_with_daily_volumes(
-    player: &ActionPlayerExport,
+    player: &PlayerExport,
     market: &MarketSnapshot,
     daily_volumes: &HashMap<String, f64>,
     histories: &HashMap<String, MarketHistoryCache>,
@@ -414,7 +415,7 @@ fn package_requirements(action: &MoneyAction) -> HashMap<String, f64> {
     requirements
 }
 
-fn inventory_quantities(player: &ActionPlayerExport) -> HashMap<String, f64> {
+fn inventory_quantities(player: &PlayerExport) -> HashMap<String, f64> {
     let mut inventory = HashMap::new();
     for item in &player.derived.inventory {
         *inventory.entry(item.item.clone()).or_default() += item.quantity;
@@ -422,7 +423,7 @@ fn inventory_quantities(player: &ActionPlayerExport) -> HashMap<String, f64> {
     inventory
 }
 
-fn vendor_prices(player: &ActionPlayerExport) -> HashMap<String, f64> {
+fn vendor_prices(player: &PlayerExport) -> HashMap<String, f64> {
     player
         .item_detail_dict
         .iter()
@@ -444,13 +445,13 @@ struct PendingBuy {
     average_limit_price: f64,
 }
 
-fn pending_buy_orders(player: &ActionPlayerExport) -> HashMap<String, PendingBuy> {
+fn pending_buy_orders(player: &PlayerExport) -> HashMap<String, PendingBuy> {
     let mut quantities = HashMap::<String, (f64, f64)>::new();
     for order in player
         .derived
         .open_orders
         .iter()
-        .filter(|order| order.side == "buy" && order.quantity > 0.0)
+        .filter(|order| order.side == OrderSide::Buy && order.quantity > 0.0)
     {
         let entry = quantities.entry(order.item.clone()).or_default();
         entry.0 += order.quantity;
@@ -518,8 +519,9 @@ fn validate_config(config: RecommendOrdersConfig) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use crate::model::MarketQuote;
-    use crate::money_actions::{
-        ActionDetail, CharacterSkill, DerivedPlayerState, FixedItem, LevelRequirement,
+    use crate::player::{
+        ActionDetail, CharacterSkill, DerivedOpenOrder, DerivedPlayerState, FixedItem,
+        LevelRequirement,
     };
 
     use super::*;
@@ -546,11 +548,12 @@ mod tests {
     #[test]
     fn does_not_recommend_an_incomplete_bundle_when_slots_are_full() {
         let mut player = test_player();
-        player.derived.open_orders = vec![crate::money_actions::DerivedOpenOrder {
-            side: "sell".into(),
+        player.derived.open_orders = vec![DerivedOpenOrder {
+            side: OrderSide::Sell,
             item: "egg".into(),
             quantity: 1.0,
             limit_price: 10.0,
+            locked_cash: 0.0,
         }];
         let result = recommend_orders_with_daily_volumes(
             &player,
@@ -566,12 +569,13 @@ mod tests {
         assert!(result.recommendation.is_none());
     }
 
-    fn test_player() -> ActionPlayerExport {
-        ActionPlayerExport {
+    fn test_player() -> PlayerExport {
+        PlayerExport {
             derived: DerivedPlayerState {
                 cash: 10_000.0,
                 ..DerivedPlayerState::default()
             },
+            character_item_map: HashMap::new(),
             character_skill_map: HashMap::from([
                 (
                     "/skills/foraging".into(),
