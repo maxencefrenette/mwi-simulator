@@ -22,7 +22,6 @@ at current bids, and items locked in sell orders at current bids.
 ## Current Commands
 
 - `fetch-market`
-- `fetch-all-history`
 - `wealth`
 - `rank-actions`
 - `recommend-orders`

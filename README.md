@@ -8,20 +8,15 @@ player state, market snapshots, and cached history.
 ```sh
 mise run chrome-mwi
 mise run export-player-state
-cargo run -- fetch-market --output market.current.json
-cargo run -- fetch-all-history \
-  --market market.current.json \
-  --output-dir .local/market-history \
-  --days 30 \
-  --delay-ms 1000
-cargo run -- wealth --player .local/exports/player-state.json --market market.current.json
+cargo run -- fetch-market
+cargo run -- wealth --player .local/exports/player-state.json --market .local/market.current.json
 cargo run -- rank-actions \
   --player .local/exports/player-state.json \
-  --market market.current.json \
+  --market .local/market.current.json \
   --history-dir .local/market-history
 cargo run -- recommend-orders \
   --player .local/exports/player-state.json \
-  --market market.current.json \
+  --market .local/market.current.json \
   --history-dir .local/market-history
 ```
 
@@ -31,11 +26,12 @@ marketplace payload from `https://www.milkywayidle.com/game_data/marketplace.jso
 The CDP player-state export is read-only and writes to
 `.local/exports/player-state.json` by default.
 
-Historical market data is cached under `.local/market-history/`. The fetch
-command uses the mooket/Q7 public history endpoint and refuses to reload a cache
-file younger than seven days unless `--force` is passed. Bulk history fetches
-only request base item level 0 data and skip item keys or names containing
-enhancement markers like `+1`.
+`fetch-market` always refreshes `.local/market.current.json` from the official
+API, then refreshes stale files under `.local/market-history/` from the
+mooket/Q7 history endpoint. It refuses to reload a history file younger than
+seven days unless `--force-history` is passed. History refreshes only request
+base item level 0 data and skip item keys or names containing enhancement
+markers like `+1`.
 
 `recommend-orders` values persistent buy-order bundles by the 24-hour action
 packages they unlock. Fill delay is estimated from a configurable share of

@@ -22,17 +22,12 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Fetch the official MWI marketplace snapshot to a JSON file.
+    /// Refresh the official market snapshot and stale historical market data.
     FetchMarket {
-        #[arg(long)]
+        #[arg(long, default_value = ".local/market.current.json")]
         output: PathBuf,
-    },
-    /// Fetch base-item third-party market history for every item in a market snapshot.
-    FetchAllHistory {
-        #[arg(long)]
-        market: PathBuf,
-        #[arg(long)]
-        output_dir: PathBuf,
+        #[arg(long, default_value = ".local/market-history")]
+        history_dir: PathBuf,
         /// Number of days requested from the history source.
         #[arg(long, default_value_t = 30)]
         days: u32,
@@ -41,7 +36,7 @@ enum Command {
         delay_ms: u64,
         /// Ignore the seven-day cache freshness guard.
         #[arg(long)]
-        force: bool,
+        force_history: bool,
     },
     /// Calculate pessimistic player wealth from a CDP player export and market bids.
     Wealth {
@@ -88,25 +83,24 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::FetchMarket { output } => {
-            fetch_official_marketplace_to_path(&output)?;
-            eprintln!("Fetched {OFFICIAL_MARKETPLACE_URL} to {}", output.display());
-        }
-        Command::FetchAllHistory {
-            market,
-            output_dir,
+        Command::FetchMarket {
+            output,
+            history_dir,
             days,
             delay_ms,
-            force,
+            force_history,
         } => {
             validate_history_request(days)?;
-            let market = read_market_snapshot(&market)?;
+            fetch_official_marketplace_to_path(&output)?;
+            eprintln!("Fetched {OFFICIAL_MARKETPLACE_URL} to {}", output.display());
+
+            let market = read_market_snapshot(&output)?;
             let report = fetch_all_market_history(
                 &market,
-                &output_dir,
+                &history_dir,
                 days,
                 Duration::from_millis(delay_ms),
-                force,
+                force_history,
             );
 
             println!("{}", serde_json::to_string_pretty(&report)?);

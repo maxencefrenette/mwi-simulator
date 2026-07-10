@@ -38,6 +38,10 @@ pub fn fetch_official_marketplace() -> anyhow::Result<String> {
 
 pub fn fetch_official_marketplace_to_path(path: &Path) -> anyhow::Result<()> {
     let body = fetch_official_marketplace()?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
     let mut file =
         File::create(path).with_context(|| format!("failed to create {}", path.display()))?;
     file.write_all(body.as_bytes())
