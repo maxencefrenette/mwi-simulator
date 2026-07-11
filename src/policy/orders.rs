@@ -272,10 +272,7 @@ impl OrderPlanningContext<'_> {
             let new_order_quantity = deficit.ceil() as u64;
             if new_order_quantity > 0 {
                 let bid = quote.bid?;
-                let desired_limit_price = quote
-                    .ask
-                    .map(|ask| (bid + config.tick_size).min(ask))
-                    .unwrap_or(bid + config.tick_size);
+                let desired_limit_price = quote.ask.unwrap_or(bid + config.tick_size);
                 let vendor_price = vendor_prices.get(&item).copied().unwrap_or(0.0);
                 let suggested_limit_price =
                     bin_market_price(desired_limit_price, PriceBinDirection::Up, vendor_price);

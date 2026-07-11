@@ -51,10 +51,11 @@ markers like `+1`.
 rankings, and persistent buy-order bundles in one result. Fill delay is
 estimated from a configurable share of
 historical daily volume, then the package uplift is discounted for waiting,
-capital lockup, and order-slot occupancy. Suggested limits use a passive
-`current bid + tick` policy, capped at the current ask; historical ask reach is
-included in the estimated fill delay. Prices are rounded to the same discrete
-bins as the game client before costs and fill times are evaluated.
+capital lockup, and order-slot occupancy. Suggested buy limits use the current
+ask when available so input packages can start filling immediately, while the
+historical ask reach is included in the estimated fill delay. Prices are
+rounded to the same discrete bins as the game client before costs and fill
+times are evaluated.
 
 ## Scope From Notion
 

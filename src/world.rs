@@ -62,8 +62,10 @@ impl<'a> World<'a> {
         config: WorldConfig,
     ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
-        let series = histories
-            .iter()
+        let mut history_items = histories.iter().collect::<Vec<_>>();
+        history_items.sort_by_key(|(item, _)| item.as_str());
+        let series = history_items
+            .into_iter()
             .filter_map(|(item, history)| {
                 if history.points.is_empty() {
                     return None;
@@ -261,19 +263,30 @@ impl<'a> World<'a> {
             let capacity = quote.volume.unwrap_or(order.remaining_quantity).max(1.0)
                 * self.config.volume_participation_rate;
             let quantity = order.remaining_quantity.min(capacity.max(1.0));
+            let execution_price = match order.side {
+                OrderSide::Buy => quote
+                    .ask
+                    .unwrap_or(order.limit_price)
+                    .min(order.limit_price),
+                OrderSide::Sell => quote
+                    .bid
+                    .unwrap_or(order.limit_price)
+                    .max(order.limit_price),
+            };
             match order.side {
                 OrderSide::Buy => {
                     *self.state.inventory.entry(order.item.clone()).or_default() += quantity;
                     order.locked_cash -= quantity * order.limit_price;
+                    self.state.cash += quantity * (order.limit_price - execution_price);
                 }
-                OrderSide::Sell => self.state.cash += quantity * order.limit_price,
+                OrderSide::Sell => self.state.cash += quantity * execution_price,
             }
             order.remaining_quantity -= quantity;
             events.push(Event::OrderFilled {
                 side: order.side,
                 item: order.item.clone(),
                 quantity,
-                price: order.limit_price,
+                price: execution_price,
             });
             if order.remaining_quantity > 1e-9 {
                 remaining.push(order);
@@ -384,6 +397,18 @@ mod tests {
 
         assert_eq!(left_transition, right_transition);
         assert_eq!(left_transition.observation.state.inventory["tea_leaf"], 5.0);
+        let execution_price = left_transition
+            .events
+            .iter()
+            .find_map(|event| match event {
+                Event::OrderFilled { price, .. } => Some(*price),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            left_transition.observation.state.cash,
+            100.0 - 5.0 * execution_price
+        );
         assert!(
             left_transition.events.iter().any(
                 |event| matches!(event, Event::OrderFilled { item, .. } if item == "tea_leaf")

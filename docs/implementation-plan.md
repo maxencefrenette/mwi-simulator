@@ -34,8 +34,8 @@ at current bids, and items locked in sell orders at current bids.
 
 1. Replace the single-package selector with a contingent order portfolio that
    values the probability of unlocking at least one profitable action package.
-2. Search valid discrete limit prices instead of always using a passive
-   `bid + tick` target.
+2. Search valid discrete limit prices between the current ask and the package's
+   profitability ceiling.
 3. Add sell orders, cancellations, and modifications to the same portfolio.
 4. Calibrate stochastic output and market-fill assumptions against observed
    results. MCTS remains out of scope.
