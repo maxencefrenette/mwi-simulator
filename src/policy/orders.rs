@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use anyhow::bail;
 use serde::Serialize;
 
+use crate::domain::{MarketSnapshot, OrderSide};
 use crate::history::MarketHistoryCache;
 use crate::market_price::{PriceBinDirection, bin_market_price, market_price_step};
-use crate::model::{MarketSnapshot, OrderSide};
 use crate::money_actions::MoneyAction;
 use crate::player::PlayerExport;
 
@@ -511,7 +511,7 @@ fn validate_config(config: OrderPolicyConfig) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::super::rank::rank_money_actions;
-    use crate::model::MarketQuote;
+    use crate::domain::MarketQuote;
     use crate::money_actions::best_money_actions;
     use crate::player::{
         ActionDetail, CharacterSkill, DerivedOpenOrder, DerivedPlayerState, FixedItem,

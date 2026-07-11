@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use serde::Deserialize;
 
-use crate::model::{MarketQuote, MarketSnapshot};
+use crate::domain::{MarketQuote, MarketSnapshot};
 
 pub const OFFICIAL_MARKETPLACE_URL: &str =
     "https://www.milkywayidle.com/game_data/marketplace.json";

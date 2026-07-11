@@ -6,9 +6,10 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use mwi_simulator::{
     data::{OFFICIAL_MARKETPLACE_URL, fetch_official_marketplace_to_path, read_market_snapshot},
-    history::{fetch_all_market_history, validate_history_request},
-    plan::{PlanConfig, plan},
+    history::{fetch_all_market_history, read_market_history_dir, validate_history_request},
     player::PlayerExport,
+    policy::{PlanConfig, plan},
+    simulation::{SimulationConfig, simulate},
     wealth::calculate_wealth,
 };
 
@@ -66,6 +67,23 @@ enum Command {
         daily_discount_rate: f64,
         #[arg(long, default_value_t = 0.001)]
         daily_capital_cost_rate: f64,
+    },
+    /// Evaluate policies against a stationary historical market model.
+    Simulate {
+        #[arg(long)]
+        player: PathBuf,
+        #[arg(long)]
+        market: PathBuf,
+        #[arg(long)]
+        history_dir: PathBuf,
+        #[arg(long, default_value_t = 30)]
+        days: u32,
+        #[arg(long, default_value_t = 100)]
+        episodes: u32,
+        #[arg(long, default_value_t = 42)]
+        seed: u64,
+        #[arg(long, default_value_t = 10)]
+        max_orders: usize,
     },
 }
 
@@ -135,6 +153,34 @@ fn main() -> anyhow::Result<()> {
             )?;
 
             println!("{}", serde_json::to_string_pretty(&daily_plan)?);
+        }
+        Command::Simulate {
+            player,
+            market,
+            history_dir,
+            days,
+            episodes,
+            seed,
+            max_orders,
+        } => {
+            let player = read_json::<PlayerExport>(&player)?;
+            let market = read_market_snapshot(&market)?;
+            let histories = read_market_history_dir(&history_dir)?;
+            let report = simulate(
+                &player,
+                &market,
+                &histories,
+                PlanConfig {
+                    max_orders,
+                    ..PlanConfig::default()
+                },
+                SimulationConfig {
+                    days,
+                    episodes,
+                    seed,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
         }
     }
 

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Recommend daily action and market-order decisions that maximize expected wealth
+Recommend daily MDP actions that maximize expected wealth
 for one Milky Way Idle character.
 
 Wealth is valued pessimistically as cash, cash locked in buy orders, inventory
@@ -13,9 +13,14 @@ at current bids, and items locked in sell orders at current bids.
 - `player`: canonical read-only CDP player export model.
 - `data`: official marketplace snapshot fetch and parsing.
 - `history`: weekly cached market-history refresh and parsing.
-- `money_actions`: noncombat action production and cost calculations.
+- `domain`: shared state, observation, action, order, and event types.
+- `money_actions`: noncombat activity production and cost calculations.
 - `market_price`: the game's discrete market-price bins.
-- `plan`: action ranking, persistent input-buy policy, and shared orchestration.
+- `policy`: deterministic observation-to-action heuristic and planning detail.
+- `world`: seeded daily transitions with stochastic output and stationary,
+  circular replay of each item's historical price series.
+- `simulation`: episodic comparison of idle, action-only, and full heuristic
+  policies.
 - `wealth`: pessimistic current wealth calculation.
 
 ## Current Commands
@@ -23,6 +28,7 @@ at current bids, and items locked in sell orders at current bids.
 - `fetch-market`
 - `wealth`
 - `plan`
+- `simulate`
 
 ## Next Steps
 
@@ -31,5 +37,5 @@ at current bids, and items locked in sell orders at current bids.
 2. Search valid discrete limit prices instead of always using a passive
    `bid + tick` target.
 3. Add sell orders, cancellations, and modifications to the same portfolio.
-4. Use the deterministic policy as candidate generation and value priors for
-   longer-horizon MCTS.
+4. Calibrate stochastic output and market-fill assumptions against observed
+   results. MCTS remains out of scope.

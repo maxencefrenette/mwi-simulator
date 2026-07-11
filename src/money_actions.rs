@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::model::MarketSnapshot;
+use crate::domain::MarketSnapshot;
 use crate::player::{ActionDetail, Buff, DropItem, PlayerExport};
 
 const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
@@ -625,7 +625,7 @@ fn item_key_from_hrid(item_hrid: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::MarketQuote;
+    use crate::domain::MarketQuote;
     use crate::player::{
         CharacterSkill, DerivedPlayerState, DrinkSlot, FixedItem, LevelRequirement,
     };

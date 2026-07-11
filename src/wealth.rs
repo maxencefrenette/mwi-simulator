@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::model::{MarketSnapshot, OrderSide};
+use crate::domain::{MarketSnapshot, OrderSide};
 use crate::player::PlayerExport;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -118,7 +118,7 @@ fn item_key_from_hrid(item_hrid: &str, enhancement_level: u32) -> String {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::model::MarketQuote;
+    use crate::domain::MarketQuote;
     use crate::player::{CharacterItem, DerivedOpenOrder, DerivedPlayerState};
 
     use super::*;

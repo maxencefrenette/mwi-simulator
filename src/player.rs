@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::model::OrderSide;
+use crate::domain::{MarketSnapshot, Observation, OpenOrder, OrderSide, State};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct PlayerExport {
@@ -139,4 +139,94 @@ pub struct DrinkSlot {
 pub struct ItemDetail {
     #[serde(default, rename = "sellPrice")]
     pub sell_price: f64,
+}
+
+pub fn state_from_export(player: &PlayerExport, market: &MarketSnapshot) -> State {
+    let inventory = player
+        .derived
+        .inventory
+        .iter()
+        .filter(|item| !is_coin(&item.item))
+        .map(|item| (item.item.clone(), item.quantity))
+        .collect::<HashMap<_, _>>();
+    let open_orders = player
+        .derived
+        .open_orders
+        .iter()
+        .map(|order| OpenOrder {
+            side: order.side,
+            item: order.item.clone(),
+            remaining_quantity: order.quantity,
+            limit_price: order.limit_price,
+            locked_cash: order.locked_cash,
+        })
+        .collect();
+    let visible_wealth = crate::domain::pessimistic_wealth(
+        &State {
+            day: 0,
+            cash: player.derived.cash,
+            inventory,
+            open_orders,
+            fixed_wealth: 0.0,
+        },
+        market,
+    );
+    let total_wealth = crate::wealth::calculate_wealth(player, market).total;
+    let mut state = State {
+        day: 0,
+        cash: player.derived.cash,
+        inventory: player
+            .derived
+            .inventory
+            .iter()
+            .filter(|item| !is_coin(&item.item))
+            .map(|item| (item.item.clone(), item.quantity))
+            .collect(),
+        open_orders: player
+            .derived
+            .open_orders
+            .iter()
+            .map(|order| OpenOrder {
+                side: order.side,
+                item: order.item.clone(),
+                remaining_quantity: order.quantity,
+                limit_price: order.limit_price,
+                locked_cash: order.locked_cash,
+            })
+            .collect(),
+        fixed_wealth: (total_wealth - visible_wealth).max(0.0),
+    };
+    state.inventory.retain(|_, quantity| *quantity > 0.0);
+    state
+}
+
+pub fn export_for_observation(template: &PlayerExport, observation: &Observation) -> PlayerExport {
+    let mut player = template.clone();
+    player.derived.cash = observation.state.cash;
+    player.derived.inventory = observation
+        .state
+        .inventory
+        .iter()
+        .map(|(item, quantity)| DerivedInventoryItem {
+            item: item.clone(),
+            quantity: *quantity,
+        })
+        .collect();
+    player.derived.open_orders = observation
+        .state
+        .open_orders
+        .iter()
+        .map(|order| DerivedOpenOrder {
+            side: order.side,
+            item: order.item.clone(),
+            quantity: order.remaining_quantity,
+            limit_price: order.limit_price,
+            locked_cash: order.locked_cash,
+        })
+        .collect();
+    player
+}
+
+fn is_coin(item: &str) -> bool {
+    item == "coin" || item.ends_with("/coin")
 }

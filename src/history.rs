@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::model::MarketSnapshot;
+use crate::domain::MarketSnapshot;
 
 pub const MOOKET_HISTORY_URL: &str = "https://q7.nainai.eu.org/api/market/history";
 const CACHE_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
@@ -199,7 +199,7 @@ fn read_market_history_cache(path: &Path) -> anyhow::Result<MarketHistoryCache> 
         .with_context(|| format!("failed to parse {}", path.display()))
 }
 
-pub(crate) fn read_market_history_dir(
+pub fn read_market_history_dir(
     history_dir: &Path,
 ) -> anyhow::Result<HashMap<String, MarketHistoryCache>> {
     let mut histories = HashMap::new();
@@ -387,7 +387,7 @@ mod tests {
             items: [
                 (
                     "egg".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -396,7 +396,7 @@ mod tests {
                 ),
                 (
                     "acrobatic_hood:10".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -405,7 +405,7 @@ mod tests {
                 ),
                 (
                     "azure_enhancer".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -414,7 +414,7 @@ mod tests {
                 ),
                 (
                     "advanced_enhancing_charm".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -423,7 +423,7 @@ mod tests {
                 ),
                 (
                     "enchanted_essence".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -432,7 +432,7 @@ mod tests {
                 ),
                 (
                     "test_item+1".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
@@ -441,7 +441,7 @@ mod tests {
                 ),
                 (
                     "acrobatic_hood".to_string(),
-                    crate::model::MarketQuote {
+                    crate::domain::MarketQuote {
                         ask: Some(1.0),
                         bid: None,
                         average: None,
